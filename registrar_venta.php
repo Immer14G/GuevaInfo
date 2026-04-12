@@ -1,32 +1,26 @@
 <?php
 include_once "funciones.php";
-
-
 session_start();
+
 $productos = $_SESSION['lista'];
 $idUsuario = $_SESSION['idUsuario'];
 $total = calcularTotalLista($productos);
 $idCliente = $_SESSION['clienteVenta'];
 
-if(count($productos) === 0) {
+if(count($productos) === 0){
     header("location: vender.php");
-    return;
-};
+    exit;
+}
+
 $resultado = registrarVenta($productos, $idUsuario, $idCliente, $total);
 
-if(!$resultado) {
+if(!$resultado){
     echo "Error al registrar la venta";
-    return;
+    exit;
 }
 
 $_SESSION['lista'] = [];
 $_SESSION['clienteVenta'] = "";
 
-echo "
-<script type='text/javascript'>
-    window.location.href='vender.php'
-    alert('Venta realizada con éxito')
-</script>";
-//header("location: vender.php");
-
-?>
+header("location: vender.php");
+exit;

@@ -261,7 +261,12 @@ function registrarVenta($productos, $idUsuario, $idCliente, $total){
     if($resultadoVenta){
         $idVenta = obtenerUltimoIdVenta();
         $productosRegistrados = registrarProductosVenta($productos, $idVenta);
-        return $resultadoVenta && $productosRegistrados;
+       if($resultadoVenta){
+         $idVenta = obtenerUltimoIdVenta();
+         registrarProductosVenta($productos, $idVenta);
+         return $idVenta;
+}
+        return false;
     }
 }
 
@@ -342,10 +347,16 @@ function agregarCantidad($idProducto, $listaProductos){
 }
 
 function obtenerProductoPorCodigo($codigo){
-    $sentencia = "SELECT * FROM productos WHERE codigo = ?";
-    $producto = select($sentencia, [$codigo]);
+    $sentencia = "SELECT * FROM productos 
+                  WHERE codigo = ? 
+                  OR nombre LIKE ?
+                  LIMIT 1";
+
+    $producto = select($sentencia, [$codigo, "%".$codigo."%"]);
+
     if($producto) return $producto[0];
-    return [];
+
+    return null;
 }
 
 function obtenerNumeroProductos(){
@@ -442,4 +453,30 @@ function conectarBaseDatos() {
 	} catch (\PDOException $e) {
 	     throw new \PDOException($e->getMessage(), (int)$e->getCode());
 	}
+
+
+
+}
+
+// ================= FUNCIONES DE NEGOCIO =================
+function calcularTotales($lista){
+    $subtotal = 0;
+    $iva = 0;
+
+    foreach($lista as $p){
+        $precio = $p->venta;
+        $cantidad = $p->cantidad;
+
+        $precioSinIva = $precio / 1.13;
+        $ivaProducto = $precio - $precioSinIva;
+
+        $subtotal += $precioSinIva * $cantidad;
+        $iva += $ivaProducto * $cantidad;
+    }
+
+    return [
+        "subtotal" => $subtotal,
+        "iva" => $iva,
+        "total" => $subtotal + $iva
+    ];
 }
