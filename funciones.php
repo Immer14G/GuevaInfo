@@ -347,17 +347,11 @@ function agregarCantidad($idProducto, $listaProductos){
 }
 
 function obtenerProductoPorCodigo($codigo){
-    $sentencia = "SELECT * FROM productos 
-                  WHERE codigo = ? 
-                  OR nombre LIKE ?
-                  LIMIT 1";
-
-    $producto = select($sentencia, [$codigo, "%".$codigo."%"]);
-
-    if($producto) return $producto[0];
-
-    return null;
+    $sentencia = "SELECT * FROM productos WHERE codigo = ? LIMIT 1";
+    $producto = select($sentencia, [$codigo]);
+    return $producto ? $producto[0] : null;
 }
+
 
 function obtenerNumeroProductos(){
     $sentencia = "SELECT IFNULL(SUM(existencia),0) AS total FROM productos";
@@ -395,14 +389,15 @@ function obtenerProductoPorId($id){
 
 function obtenerProductos($busqueda = null){
     $parametros = [];
-    $sentencia = "SELECT * FROM productos ";
-    if(isset($busqueda)){
-        $sentencia .= " WHERE nombre LIKE ? OR codigo LIKE ?";
-        array_push($parametros, "%".$busqueda."%", "%".$busqueda."%"); 
-    } 
+    $sentencia = "SELECT * FROM productos";
+
+    if($busqueda){
+        $sentencia .= " WHERE nombre LIKE ? OR codigo LIKE ? LIMIT 10";
+        array_push($parametros, "%".$busqueda."%", "%".$busqueda."%");
+    }
+
     return select($sentencia, $parametros);
 }
-
 function registrarProducto($codigo, $nombre, $compra, $venta, $existencia){
     $sentencia = "INSERT INTO productos(codigo, nombre, compra, venta, existencia) VALUES (?,?,?,?,?)";
     $parametros = [$codigo, $nombre, $compra, $venta, $existencia];

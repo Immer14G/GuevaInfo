@@ -1,26 +1,37 @@
-<?php   
-    include_once "funciones.php";
-    session_start();
-    if(isset($_POST['agregar'])){
-    
-        if(isset($_POST['codigo'])) {
-           $codigo = trim($_POST['codigo']);
-// 🔥 BUSCAR POR CODIGO PRIMERO
-        $producto = obtenerProductoPorCodigo($codigo);
+<?php
+include_once "funciones.php";
+session_start();
 
-// 🔥 SI NO EXISTE → BUSCAR POR NOMBRE (PRIMER RESULTADO)
-        if(!$producto){
-    $productos = obtenerProductos($codigo); // usa LIKE
+$_SESSION['lista'] = $_SESSION['lista'] ?? [];
 
-    if($productos){
-        $producto = $productos[0]; // toma el primero
+// 🔥 CLICK
+if(isset($_POST['id'])){
+    $producto = obtenerProductoPorId($_POST['id']);
+
+    if($producto){
+        $_SESSION['lista'] = agregarProductoALista($producto, $_SESSION['lista']);
     }
+
+    exit;
 }
-            print_r($producto);
-            $_SESSION['lista'] = agregarProductoALista($producto,  $_SESSION['lista']);
-            unset($_POST['codigo']);
-            header("location: vender.php");
+
+// 🔥 INPUT
+if(isset($_POST['agregar']) && isset($_POST['codigo'])){
+
+    $codigo = trim($_POST['codigo']);
+
+    $producto = obtenerProductoPorCodigo($codigo);
+
+    if(!$producto){
+        $productos = obtenerProductos($codigo);
+        if($productos){
+            $producto = $productos[0];
         }
     }
 
-?>
+    if($producto){
+        $_SESSION['lista'] = agregarProductoALista($producto, $_SESSION['lista']);
+    }
+
+    header("Location: vender.php");
+}

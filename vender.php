@@ -51,17 +51,20 @@ $clienteSeleccionado = $clienteSeleccionado ? obtenerClientePorId($clienteSelecc
     padding:10px;
     margin-top:10px;
 }
-
 .empty-state{
     text-align:center;
     margin-top:80px;
     color:#6c757d;
 }
-
 .empty-state i{
     font-size:70px;
     margin-bottom:15px;
     opacity:0.7;
+}
+#lista_productos a:hover{
+    background:#0d6efd;
+    color:white;
+    cursor:pointer;
 }
 </style>
 
@@ -137,15 +140,10 @@ Cancelar
 
 <?php } else { ?>
 
-<!-- 🔥 ESTADO VACÍO -->
 <div class="empty-state">
     <i class="fa fa-cash-register"></i>
     <h3>No hay productos en la venta</h3>
     <p>Escanea o busca un producto para comenzar</p>
-
-    <div class="alert alert-info mt-3">
-        💡 Puedes buscar por nombre o código
-    </div>
 </div>
 
 <?php } ?>
@@ -181,17 +179,19 @@ Confirmar pago
 </div>
 
 <!-- ================= JS ================= -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
 <script>
 let total = <?= $total ?>;
 
-document.getElementById("pagoCliente")?.addEventListener("input", function(){
+$("#pagoCliente").on("input", function(){
     let pago = parseFloat(this.value || 0);
-    document.getElementById("vuelto").innerText = (pago - total).toFixed(2);
+    $("#vuelto").text((pago - total).toFixed(2));
 });
 
 function finalizarVenta(){
-    let pago = parseFloat(document.getElementById("pagoCliente").value || 0);
-    let tipo = document.getElementById("tipoPago").value;
+    let pago = parseFloat($("#pagoCliente").val() || 0);
+    let tipo = $("#tipoPago").val();
 
     if(tipo === "CONTADO" && pago < total){
         alert("Pago insuficiente");
@@ -210,45 +210,35 @@ function finalizarVenta(){
 
     window.location.href = "registrar_venta.php";
 }
-</script>
 
-<!-- ================= BUSCADOR ================= -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+// 🔥 BUSCADOR
+$("#codigo").on("keyup", function () {
+    let query = $(this).val().trim();
 
-<script>
-$(document).ready(function () {
+    if (query.length < 1) {
+        $("#lista_productos").html("");
+        return;
+    }
 
-    $("#codigo").on("keyup", function () {
-
-        let query = $(this).val().trim();
-
-        if (query.length < 1) {
-            $("#lista_productos").html("");
-            return;
-        }
-
-        $.ajax({
-            url: "buscar_productos.php",
-            method: "POST",
-            data: { query: query },
-            success: function (data) {
-                $("#lista_productos").html(data);
-            }
-        });
-
+    $.post("buscar_producto.php", {query}, function(data){
+        $("#lista_productos").html(data);
     });
+});
 
-  $(document).on("click", ".producto-item", function (e) {
+// 🔥 CLICK PRODUCTO
+$(document).on("click", ".producto-item", function (e) {
     e.preventDefault();
+    let id = $(this).data("id");
 
-   let id = $(this).data("id");
+    $.post("agregar_producto_venta.php", {id}, function(){
+        location.reload();
+    });
+});
 
-$.post("agregar_producto_venta.php", {
-    id: id,
-    agregar: true
-}, function(){
-    location.reload();
-});
-});
+// 🔥 CERRAR LISTA
+$(document).click(function(e){
+    if(!$(e.target).closest('#codigo').length){
+        $("#lista_productos").html("");
+    }
 });
 </script>

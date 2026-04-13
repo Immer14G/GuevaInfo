@@ -14,9 +14,21 @@ class TicketPOS {
     private $iva = 0;
     private $total = 0;
 
-    public function __construct($cliente = "CLIENTE GENERAL") {
+    public function __construct() {
+
         $this->ticket = str_pad(rand(1,999999), 6, "0", STR_PAD_LEFT);
         $this->fecha = date("d/m/Y H:i:s");
+
+        $cliente = "CLIENTE GENERAL";
+
+        if(isset($_SESSION['clienteVenta']) && $_SESSION['clienteVenta']){
+            $clienteData = obtenerClientePorId($_SESSION['clienteVenta']);
+            
+            if($clienteData){
+                $cliente = $clienteData->nombre;
+            }
+        }
+
         $this->cliente = strtoupper($cliente);
     }
 
@@ -30,14 +42,14 @@ class TicketPOS {
             "subtotal" => $sub
         ];
 
-        $this->subtotal += $sub;
+        $this->total += $sub; // 🔥 total ya incluye IVA
     }
 
     private function calcular() {
 
-        // 🔥 IVA INCLUIDO (no se suma encima)
-        $this->iva = $this->subtotal - ($this->subtotal / 1.13);
-        $this->total = $this->subtotal;
+        // 🔥 TOTAL ya incluye IVA
+        $this->subtotal = round($this->total / 1.13, 2);
+        $this->iva = round($this->total - $this->subtotal, 2);
     }
 
     private function linea() {
@@ -48,9 +60,18 @@ class TicketPOS {
 
         $this->calcular();
 
-        header("Content-Type: text/plain");
+        header("Content-Type: text/html");
 
-        echo "        MI NEGOCIO POS        \n";
+        echo "<div style='font-family:monospace; width:250px;'>";
+
+        // 🔥 LOGO
+        echo "<div style='text-align:center;'>
+                <img src='logo.png' width='120'><br>
+                <b>GuevaINfo</b>
+              </div>";
+
+        echo "<pre>";
+
         echo $this->linea();
         echo "TICKET: " . $this->ticket . "\n";
         echo "FECHA : " . $this->fecha . "\n";
@@ -75,28 +96,23 @@ class TicketPOS {
         echo $this->linea();
 
         printf("SUBTOTAL:           %10.2f\n", $this->subtotal);
-        printf("IVA INCLUIDO:       %10.2f\n", $this->iva);
+        printf("IVA (13%%):          %10.2f\n", $this->iva);
         echo $this->linea();
         printf("TOTAL:              %10.2f\n", $this->total);
 
         echo $this->linea();
         echo "     GRACIAS POR SU COMPRA     \n";
         echo "        VUELVA PRONTO          \n";
+
+        echo "</pre>";
+        echo "</div>";
     }
 }
 
 /* ================= USO REAL ================= */
 
-$cliente = "CLIENTE GENERAL";
-
-if(isset($_SESSION['clienteVenta']) && $_SESSION['clienteVenta']){
-    $clienteData = obtenerClientePorId($_SESSION['clienteVenta']);
-    if($clienteData){
-        $cliente = $clienteData->nombre;
-    }
-}
-
-$ticket = new TicketPOS($cliente);
+// 🔥 CORREGIDO (SIN PARÁMETRO)
+$ticket = new TicketPOS();
 
 if(isset($_SESSION['lista']) && count($_SESSION['lista']) > 0){
 
