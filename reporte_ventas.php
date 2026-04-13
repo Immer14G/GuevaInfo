@@ -2,133 +2,193 @@
 include_once "encabezado.php";
 include_once "navbar.php";
 include_once "funciones.php";
+
 session_start();
 if(empty($_SESSION['usuario'])) header("location: login.php");
 
-if(isset($_POST['buscar'])){
-    if(empty($_POST['inicio']) || empty($_POST['fin'])) header("location: reporte_ventas.php");
+// ================= VALIDACIONES =================
+$fechaInicio = $_POST['inicio'] ?? null;
+$fechaFin = $_POST['fin'] ?? null;
+$idUsuario = $_POST['idUsuario'] ?? null;
+$idCliente = $_POST['idCliente'] ?? null;
+
+// ================= QUERY BASE =================
+$parametros = [];
+$sql = "SELECT 
+        ventas.*,
+        usuarios.usuario,
+        IFNULL(clientes.nombre,'MOSTRADOR') AS cliente,
+        tipos_pago.nombre AS tipo_pago
+        FROM ventas
+        INNER JOIN usuarios ON usuarios.id = ventas.idUsuario
+        LEFT JOIN clientes ON clientes.id = ventas.idCliente
+        LEFT JOIN tipos_pago ON tipos_pago.id = ventas.idTipoPago
+        WHERE 1=1";
+// ================= FILTROS =================
+if(!empty($fechaInicio) && !empty($fechaFin)){
+    $sql .= " AND DATE(ventas.fecha) BETWEEN ? AND ?";
+    $parametros[] = $fechaInicio;
+    $parametros[] = $fechaFin;
 }
 
-if(isset($_POST['buscarPorUsuario'])){
-    if(empty($_POST['idUsuario'])) header("location: reporte_ventas.php");
+if(!empty($idUsuario)){
+    $sql .= " AND ventas.idUsuario = ?";
+    $parametros[] = $idUsuario;
 }
 
-if(isset($_POST['buscarPorCliente'])){
-    if(empty($_POST['idCliente'])) header("location: reporte_ventas.php");
+if(!empty($idCliente)){
+    $sql .= " AND ventas.idCliente = ?";
+    $parametros[] = $idCliente;
 }
 
-$fechaInicio = (isset($_POST['inicio'])) ? $_POST['inicio'] : null;
-$fechaFin = (isset($_POST['fin'])) ? $_POST['fin'] : null;
-$usuario = (isset($_POST['idUsuario'])) ? $_POST['idUsuario'] : null;
-$cliente = (isset($_POST['idCliente'])) ? $_POST['idCliente'] : null;
+$sql .= " ORDER BY ventas.id DESC";
 
-$ventas = obtenerVentas($fechaInicio, $fechaFin, $cliente, $usuario);
+$ventas = select($sql, $parametros);
 
-$cartas = [
-    ["titulo" => "No. ventas", "icono" => "fa fa-shopping-cart", "total" => count($ventas), "color" => "#A71D45"],
-    ["titulo" => "Total ventas", "icono" => "fa fa-money-bill", "total" => "$".calcularTotalVentas($ventas), "color" => "#2A8D22"],
-    ["titulo" => "Productos vendidos", "icono" => "fa fa-box", "total" =>calcularProductosVendidos($ventas), "color" => "#223D8D"],
-    ["titulo" => "Ganancia", "icono" => "fa fa-wallet", "total" => "$". obtenerGananciaVentas($ventas), "color" => "#D55929"],
-];
-
-$clientes = obtenerClientes();
 $usuarios = obtenerUsuarios();
-?>
-<div class="container">
-    <h2>Reporte de ventas : 
-        <?php 
-        if(empty($fechaInicio)) echo HOY;
-        if(isset($fechaInicio) && isset($fechaFin)) echo $fechaInicio ." al ". $fechaFin;
-        ?>
-    </h2>
-    <form class="row mb-3" method="post">
-        <div class="col-5">
-            <label for="inicio" class="form-label">Fecha busqueda inicial</label>
-            <input type="date" name="inicio" class="form-control" id="inicio" >
-        </div>
-        <div class="col-5">
-            <label for="fin" class="form-label">Fecha busqueda final</label>
-            <input type="date" name="fin" class="form-control" id="fin" >
-        </div>
-        <div class="col">
-            <input type="submit" name="buscar" value="Buscar" class="btn btn-primary mt-4">
-        </div>
-    </form>
-    <div class="row mb-2">
-        <div class="col">
-            <form action="" method="post" class="row">
-                <div class="col-6">
-                <select class="form-select" aria-label="Default select example" name="idUsuario">
-                    <option selected value="">Selecciona un usuario</option>
-                    <?php foreach($usuarios as $usuario) {?>
-                    <option value="<?= $usuario->id?>"><?= $usuario->usuario?></option>
-                    <?php }?>
-                </select>
-                </div>
-                <div class="col-1">
-                    <input type="submit" name="buscarPorUsuario" value="Buscar por usuario" class="btn btn-secondary">
-                </div>
-            </form>
-        </div>
-        <div class="col">
-            <form action="" method="post" class="row">
-                <div class="col-6">
-                <select class="form-select" aria-label="Default select example" name="idCliente">
-                    <option selected value="">Selecciona un cliente</option>
-                    <?php foreach($clientes as $cliente) {?>
-                    <option value="<?= $cliente->id?>"><?= $cliente->nombre?></option>
-                    <?php }?>
-                </select>
-                </div>
-                <div class="col-1">
-                    <input type="submit" name="buscarPorCliente" value="Buscar por cliente" class="btn btn-secondary">
-                </div>
-            </form>
-        </div>
+$clientes = obtenerClientes();
 
+// ================= FUNCIÓN BADGE PAGO =================
+
+
+?>
+
+<style>
+.reporte-card{
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 5px 20px rgba(0,0,0,0.08);
+}
+
+.badge-pos{
+    padding:6px 10px;
+    border-radius:10px;
+    font-size:12px;
+}
+</style>
+
+<div class="container mt-3">
+
+<h3>📊 Reporte de Ventas</h3>
+
+<!-- ================= FILTROS ================= -->
+<form method="post" class="row g-2 mt-2">
+
+    <div class="col-md-4">
+        <label>Fecha inicio</label>
+        <input type="date" name="inicio" class="form-control">
     </div>
-    <?php include_once "cartas_totales.php"?>
-    <?php if(count($ventas) > 0){?>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Total</th>
-                <th>Usuario</th>
-                <th>Productos</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach($ventas as $venta) {?>
-                <tr>
-                    <td><?= $venta->id;?></td>
-                    <td><?= $venta->fecha;?></td>
-                    <td><?= $venta->cliente;?></td>
-                    <td>$<?= $venta->total;?></td>
-                    <td><?= $venta->usuario;?></td>
-                    <td>
-                        <table class="table">
-                            <?php foreach($venta->productos as $producto) {?>
-                                <tr>
-                                    <td><?= $producto->nombre;?></td>
-                                    <td><?= $producto->cantidad;?></td>
-                                    <td> X </td>
-                                    <td>$<?=  $producto->precio ;?></td>
-                                    <th>$<?= $producto->cantidad * $producto->precio ;?></th>
-                                </tr>
-                                <?php }?>
-                        </table>
-                    </td>
-                </tr>
-            <?php }?>
-        </tbody>
-    </table>
-    <?php }?>
-    <?php if(count($ventas) < 1){?>
-        <div class="alert alert-warning mt-3" role="alert">
-            <h1>No se han encontrado ventas</h1>
-        </div>
-    <?php }?>
+
+    <div class="col-md-4">
+        <label>Fecha fin</label>
+        <input type="date" name="fin" class="form-control">
+    </div>
+
+    <div class="col-md-4">
+        <label>Usuario</label>
+        <select name="idUsuario" class="form-select">
+            <option value="">Todos</option>
+            <?php foreach($usuarios as $u){ ?>
+                <option value="<?= $u->id ?>"><?= $u->usuario ?></option>
+            <?php } ?>
+        </select>
+    </div>
+
+    <div class="col-md-4 mt-2">
+        <label>Cliente</label>
+        <select name="idCliente" class="form-select">
+            <option value="">Todos</option>
+            <?php foreach($clientes as $c){ ?>
+                <option value="<?= $c->id ?>"><?= $c->nombre ?></option>
+            <?php } ?>
+        </select>
+    </div>
+
+    <div class="col-md-12 mt-3">
+        <button class="btn btn-primary">🔎 Buscar</button>
+    </div>
+
+</form>
+
+<!-- ================= TABLA ================= -->
+<div class="reporte-card mt-4">
+
+<?php if(count($ventas) > 0){ ?>
+
+<table class="table table-hover align-middle">
+<thead class="table-dark">
+<tr>
+    <th>ID</th>
+    <th>Fecha</th>
+    <th>Cliente</th>
+    <th>Usuario</th>
+    <th>Total</th>
+    <th>Pago</th>
+    <th>Documento</th>
+    <th>Estado</th>
+    <th>Ver</th>
+</tr>
+</thead>
+
+<tbody>
+
+<?php foreach($ventas as $v){ ?>
+
+<?php [$colorPago, $textoPago] = badgePago($v->tipo_pago); ?>
+
+<tr>
+    <td><?= $v->id ?></td>
+
+    <td><?= date("d/m/Y H:i", strtotime($v->fecha)) ?></td>
+
+    <td><?= $v->cliente ?></td>
+
+    <td><?= $v->usuario ?></td>
+
+    <td><b>$<?= number_format($v->total,2) ?></b></td>
+
+    <!-- ================= TIPO PAGO ================= -->
+    <td>
+        <span class="badge bg-<?= $colorPago ?> badge-pos">
+            <?= $textoPago ?>
+        </span>
+    </td>
+
+    <td>
+        <span class="badge bg-secondary badge-pos">
+            <?= $v->tipo_documento ?>
+        </span>
+    </td>
+
+    <td>
+        <span class="badge bg-success badge-pos">
+            <?= $v->estado ?>
+        </span>
+    </td>
+
+    <td>
+        <a class="btn btn-sm btn-success"
+           target="_blank"
+           href="ticket_reporte.php?id=<?= $v->id ?>">
+           🧾
+        </a>
+    </td>
+
+</tr>
+
+<?php } ?>
+
+</tbody>
+</table>
+
+<?php } else { ?>
+
+<div class="alert alert-warning text-center">
+    <h4>No hay ventas registradas</h4>
+</div>
+
+<?php } ?>
+
+</div>
 </div>

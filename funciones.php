@@ -226,10 +226,8 @@ function obtenerVentas($fechaInicio, $fechaFin, $cliente, $usuario){
         $ventas = select($sentencia, $parametros);
         return agregarProductosVendidos($ventas);
     }
-
-    if(isset($fechaInicio) && isset($fechaFin)){
-        $sentencia .= " WHERE DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?";
-        array_push($parametros, $fechaInicio, $fechaFin);
+    if(empty($fechaInicio) && empty($fechaFin) && empty($cliente) && empty($usuario)){
+    return agregarProductosVendidos(select($sentencia, $parametros));
     }
 
     $ventas = select($sentencia, $parametros);
@@ -254,20 +252,29 @@ function obtenerProductosVendidos($idVenta){
 }
 
 function registrarVenta($productos, $idUsuario, $idCliente, $total){
-    $sentencia =  "INSERT INTO ventas (fecha, total, idUsuario, idCliente) VALUES (?,?,?,?)";
-    $parametros = [date("Y-m-d H:i:s"), $total, $idUsuario, $idCliente];
 
-    $resultadoVenta = insertar($sentencia, $parametros);
-    if($resultadoVenta){
-        $idVenta = obtenerUltimoIdVenta();
-        $productosRegistrados = registrarProductosVenta($productos, $idVenta);
-       if($resultadoVenta){
-         $idVenta = obtenerUltimoIdVenta();
-         registrarProductosVenta($productos, $idVenta);
-         return $idVenta;
-}
+    //  si no hay cliente, usar NULL real
+    if(empty($idCliente)){
+        $idCliente = null;
+    }
+
+    $sentencia = "INSERT INTO ventas (fecha, total, idUsuario, idCliente) 
+                  VALUES (NOW(), ?, ?, ?)";
+
+    $parametros = [$total, $idUsuario, $idCliente];
+
+    $resultado = insertar($sentencia, $parametros);
+
+    if(!$resultado){
         return false;
     }
+
+    $idVenta = conectarBaseDatos()->lastInsertId();
+
+   
+    registrarProductosVenta($productos, $idVenta);
+
+    return $idVenta;
 }
 
 function registrarProductosVenta($productos, $idVenta){
@@ -290,7 +297,6 @@ function obtenerUltimoIdVenta(){
     $sentencia  = "SELECT id FROM ventas ORDER BY id DESC LIMIT 1";
     return select($sentencia)[0]->id;
 }
-
 function calcularTotalLista($lista){
     $total = 0;
     foreach($lista as $producto){
@@ -474,4 +480,113 @@ function calcularTotales($lista){
         "iva" => $iva,
         "total" => $subtotal + $iva
     ];
+}
+// ================= FUNCIONES DE CAJA =================
+
+function abrirCaja($montoInicial, $idUsuario){
+    $sentencia = "INSERT INTO caja 
+    (fecha_apertura, monto_inicial, total_ventas, estado, idUsuario) 
+    VALUES (NOW(), ?, 0, 'ABIERTA', ?)";
+
+    return insertar($sentencia, [$montoInicial, $idUsuario]);
+}
+function obtenerCajaAbierta($idUsuario){
+    $sentencia = "SELECT * FROM caja 
+                  WHERE estado = 'ABIERTA' 
+                  AND idUsuario = ? 
+                  ORDER BY id DESC 
+                  LIMIT 1";
+
+    $res = select($sentencia, [$idUsuario]);
+
+    return ($res && count($res) > 0) ? $res[0] : null;
+}
+function sumarVentaACaja($total, $idUsuario){
+
+    $caja = obtenerCajaAbierta($idUsuario);
+
+    if(!$caja){
+        return false;
+    }
+
+    // 🔥 ASEGURAR FLOAT
+    $total = floatval($total);
+
+    // 🔥 EVITAR NULL
+    if($total <= 0){
+        return false;
+    }
+
+    $sentencia = "UPDATE caja 
+                  SET total_ventas = IFNULL(total_ventas,0) + ?
+                  WHERE id = ?";
+
+    return editar($sentencia, [$total, $caja->id]);
+}
+
+// ================= FUNCIONES DE TIPO PAGO =================
+function obtenerTiposPago(){
+    $sql = "SELECT * FROM tipos_pago WHERE estado = 'ACTIVO'";
+    return select($sql);
+}
+function badgePago($tipo){
+    $tipo = strtoupper($tipo);
+
+    switch($tipo){
+        case "EFECTIVO":
+            return ["success","💵 Efectivo"];
+        case "TARJETA":
+            return ["primary","💳 Tarjeta"];
+        case "TRANSFERENCIA":
+            return ["warning","🏦 Transferencia"];
+        default:
+            return ["secondary","💰 Otro"];
+    }
+}
+
+// ================= FUNCIONES DE REPORTES =================
+function obtenerVentasHoyDetallado(){
+    $sentencia = "SELECT 
+        IFNULL(SUM(total),0) AS total,
+        IFNULL(SUM(monto_recibido),0) AS efectivo
+    FROM ventas
+    WHERE DATE(fecha) = CURDATE()";
+
+    return select($sentencia)[0];
+}
+
+function ventasPorTipoPagoHoy(){
+    $sql = "SELECT 
+        tipo_pago,
+        IFNULL(SUM(total),0) AS total
+    FROM ventas
+    WHERE DATE(fecha) = CURDATE()
+    GROUP BY tipo_pago";
+
+    return select($sql);
+}
+
+function obtenerCierreCajaPro(){
+    $ventas = select("SELECT 
+        IFNULL(SUM(total),0) AS total,
+        IFNULL(SUM(monto_recibido),0) AS efectivo
+    FROM ventas
+    WHERE DATE(fecha) = CURDATE()")[0];
+
+    $tipos = ventasPorTipoPagoHoy();
+
+    $resultado = [
+        "total" => $ventas->total,
+        "efectivo" => $ventas->efectivo,
+        "tarjeta" => 0,
+        "transferencia" => 0
+    ];
+
+    foreach($tipos as $t){
+        if($t->tipo_pago == "EFECTIVO") $resultado["efectivo"] = $t->total;
+        if($t->tipo_pago == "TARJETA") $resultado["tarjeta"] = $t->total;
+        if($t->tipo_pago == "TRANSFERENCIA") $resultado["transferencia"] = $t->total;
+    }
+
+    return $resultado;
 }

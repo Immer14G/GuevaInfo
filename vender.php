@@ -66,6 +66,81 @@ $clienteSeleccionado = $clienteSeleccionado ? obtenerClientePorId($clienteSelecc
     color:white;
     cursor:pointer;
 }
+
+/* ===== MODAL PRO ===== */
+.modal-content{
+    border-radius: 18px;
+    border: none;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    overflow: hidden;
+}
+
+/* Encabezado del modal (si luego quieres agregar header) */
+.modal-content h4{
+    font-weight: 700;
+    text-align: center;
+    padding: 10px 0;
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    color: white;
+    border-radius: 12px;
+    margin-bottom: 15px;
+}
+
+/* Inputs más modernos */
+.modal-content input,
+.modal-content select{
+    border-radius: 12px;
+    padding: 10px;
+    border: 1px solid #e0e0e0;
+    transition: 0.2s;
+}
+
+.modal-content input:focus,
+.modal-content select:focus{
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.15rem rgba(13,110,253,.25);
+}
+
+/* Botón confirmar */
+.modal-content .btn-primary{
+    border-radius: 12px;
+    padding: 12px;
+    font-weight: 600;
+    background: linear-gradient(135deg, #198754, #157347);
+    border: none;
+    transition: 0.2s;
+}
+
+.modal-content .btn-primary:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(25,135,84,0.3);
+}
+
+/* Selector tipo pago más bonito */
+#tipoPago{
+    background: #f8f9fa;
+}
+
+/* Caja de vuelto PRO */
+.vuelto-box{
+    background: linear-gradient(135deg, #f1f3f5, #e9ecef);
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 22px;
+    font-weight: 700;
+    color: #198754;
+}
+
+/* Animación suave del modal */
+.modal.fade .modal-dialog{
+    transform: scale(0.95);
+    transition: all 0.2s ease-in-out;
+}
+
+.modal.show .modal-dialog{
+    transform: scale(1);
+}
 </style>
 
 <!-- ================= LISTA ================= -->
@@ -151,6 +226,7 @@ Cancelar
 </div>
 
 <!-- ================= MODAL ================= -->
+<!-- ================= MODAL ================= -->
 <div class="modal fade" id="modalPago">
 <div class="modal-dialog">
 <div class="modal-content p-3">
@@ -158,16 +234,42 @@ Cancelar
 <h4>Total: $<?= number_format($total,2) ?></h4>
 
 <label>Tipo de pago</label>
+<?php $tiposPago = obtenerTiposPago(); ?>
+
+<label>Tipo de pago</label>
+<?php $tiposPago = obtenerTiposPago(); ?>
+
+<label>Tipo de pago</label>
+<?php $tiposPago = obtenerTiposPago(); ?>
+
+<label>Tipo de pago</label>
 <select id="tipoPago" class="form-control mb-2">
-<option value="CONTADO">Contado</option>
-<option value="CREDITO">Crédito</option>
+    <?php foreach($tiposPago as $tp){ ?>
+        <option value="<?= $tp->nombre ?>">
+            <?= $tp->nombre ?>
+        </option>
+    <?php } ?>
 </select>
+<!-- EFECTIVO -->
+<div id="boxEfectivo">
+    <label>Pago cliente</label>
+    <input type="number" id="pagoCliente" class="form-control">
 
-<label>Pago cliente</label>
-<input type="number" id="pagoCliente" class="form-control">
+    <div class="vuelto-box">
+        Vuelto: $<span id="vuelto">0.00</span>
+    </div>
+</div>
 
-<div class="vuelto-box">
-Vuelto: $<span id="vuelto">0.00</span>
+<!-- TARJETA -->
+<div id="boxTarjeta" style="display:none;">
+    <label>Referencia tarjeta</label>
+    <input type="text" id="refTarjeta" class="form-control">
+</div>
+
+<!-- TRANSFERENCIA -->
+<div id="boxTransferencia" style="display:none;">
+    <label>Referencia transferencia</label>
+    <input type="text" id="refTransferencia" class="form-control">
 </div>
 
 <button class="btn btn-primary mt-3 w-100" onclick="finalizarVenta()">
@@ -184,24 +286,60 @@ Confirmar pago
 <script>
 let total = <?= $total ?>;
 
+// CAMBIO TIPO PAGO
+$("#tipoPago").on("change", function(){
+    let tipo = $(this).val();
+
+    $("#boxEfectivo, #boxTarjeta, #boxTransferencia").hide();
+
+    if(tipo === "EFECTIVO") $("#boxEfectivo").show();
+    if(tipo === "TARJETA") $("#boxTarjeta").show();
+    if(tipo === "TRANSFERENCIA") $("#boxTransferencia").show();
+});
+
+// VUELTO
 $("#pagoCliente").on("input", function(){
     let pago = parseFloat(this.value || 0);
     $("#vuelto").text((pago - total).toFixed(2));
 });
 
 function finalizarVenta(){
-    let pago = parseFloat($("#pagoCliente").val() || 0);
-    let tipo = $("#tipoPago").val();
 
-    if(tipo === "CONTADO" && pago < total){
-        alert("Pago insuficiente");
-        return;
+    let tipo = $("#tipoPago").val();
+    let pago = parseFloat($("#pagoCliente").val() || 0);
+    let referencia = "";
+
+    // VALIDACIONES
+    if(tipo === "EFECTIVO"){
+        if(pago < total){
+            alert("Pago insuficiente");
+            return;
+        }
     }
 
+    if(tipo === "TARJETA"){
+        referencia = $("#refTarjeta").val();
+        if(referencia.trim() === ""){
+            alert("Ingrese referencia");
+            return;
+        }
+        pago = total;
+    }
+
+    if(tipo === "TRANSFERENCIA"){
+        referencia = $("#refTransferencia").val();
+        if(referencia.trim() === ""){
+            alert("Ingrese referencia");
+            return;
+        }
+        pago = total;
+    }
+
+    // 🔥 ENVIAR A TU MISMO FLUJO QUE YA FUNCIONA
     fetch("guardar_tipo_pago.php", {
         method:"POST",
         headers:{'Content-Type':'application/x-www-form-urlencoded'},
-        body:"tipo="+tipo
+        body:"tipo="+tipo+"&monto="+pago+"&referencia="+referencia
     });
 
     if(confirm("¿Imprimir ticket?")){
@@ -210,7 +348,6 @@ function finalizarVenta(){
 
     window.location.href = "registrar_venta.php";
 }
-
 // 🔥 BUSCADOR
 $("#codigo").on("keyup", function () {
     let query = $(this).val().trim();

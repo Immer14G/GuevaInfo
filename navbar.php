@@ -44,6 +44,7 @@
             Reporte ventas
             </a>
         </li>
+        
         </ul>
         <ul class="navbar-nav">
             <li class="nav-item">

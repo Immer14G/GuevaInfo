@@ -4,6 +4,8 @@ include_once "funciones.php";
 
 date_default_timezone_set('America/El_Salvador');
 
+
+
 class TicketPOS {
 
     private $ticket;
@@ -57,6 +59,8 @@ class TicketPOS {
     }
 
     public function print() {
+
+    
 
         $this->calcular();
 
@@ -129,3 +133,4 @@ if(isset($_SESSION['lista']) && count($_SESSION['lista']) > 0){
 } else {
     echo "No hay productos en la venta";
 }
+
